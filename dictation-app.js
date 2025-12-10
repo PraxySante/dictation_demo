@@ -126,7 +126,7 @@ export class DictationApp {
     if (!this.isWorkletLoaded) {
       console.log("Chargement du module audio-processor.js...");
       try {
-        await context.audioWorklet.addModule("/audio-processor.js");
+        await context.audioWorklet.addModule("./audio-processor.js");
         this.isWorkletLoaded = true;
       } catch (e) {
         console.error("Erreur lors du chargement du module AudioWorklet:", e);
