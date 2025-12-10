@@ -8,8 +8,8 @@ services:
       dockerfile: Dockerfile
     container_name: dictation_frontend
     
-    expose:
-      - "80" 
+    ports:
+      - "127.0.0.1:8088:80" 
     
     restart: always
     
@@ -24,7 +24,7 @@ services:
     env_file:
       - ./backend/.env
     
-    expose:
-      - "3000"
+    ports:
+      - "127.0.0.1:3000:3000"
       
     restart: always
