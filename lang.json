@@ -1,0 +1,102 @@
+{
+  "fr": {
+    "title": "Demo Dictée",
+    "loading": "Chargement...",
+    "patient_name": "Nom du patient",
+    "symptoms": "Symptômes",
+    "clinical_notes": "Notes cliniques",
+    "instructions_title": "Comment utiliser",
+    "instructions": [
+      "Cliquez dans un champ pour positionner le curseur",
+      "Cliquez sur l'icone du microphone pour démarrer la dictée",
+      "Parlez clairement dans le microphone",
+      "Le texte apparaîtra à la position du curseur",
+      "Appuyez sur Esc ou sur l'icone pour arrêter"
+    ],
+    "dictate_button": "dictée activée",
+    "stop_dictation": "fin de la dictée",
+    "field_selected": "Champ sélectionné. Prêt à dicter.",
+    "default_mic_name": "Microphone par défaut",
+    "no_mic_found": "Aucun microphone détecté.",
+    "mic_selected_success": "Microphone sélectionné.",
+    "error_no_field_selected": "Veuillez cliquer dans un champ de saisie avant de commencer la dictée.",
+    "error_micro_permission": "Erreur: Accès au microphone refusé. Veuillez l'autoriser dans les paramètres du navigateur.",
+    "error_general_start": "Erreur de démarrage de la dictée. Veuillez vérifier votre connexion et les permissions micro.",
+    "error_general_start_prefix": "Erreur de démarrage : "
+  },
+  "en": {
+    "title": "Dictation Demo",
+    "loading": "Loading...",
+    "patient_name": "Patient Name",
+    "symptoms": "Symptoms",
+    "clinical_notes": "Clinical Notes",
+    "instructions_title": "How to Use",
+    "instructions": [
+      "Click into a field to position the cursor",
+      "Click the microphone icon to start dictation",
+      "Speak clearly into the microphone",
+      "The text will appear at the cursor position",
+      "Press Esc or click the icon to stop"
+    ],
+    "dictate_button": "Dictation Activated",
+    "stop_dictation": "Dictation Finished",
+    "field_selected": "Field selected. Ready to dictate.",
+    "default_mic_name": "Default Microphone",
+    "no_mic_found": "No microphone detected.",
+    "mic_selected_success": "Microphone selected.",
+    "error_no_field_selected": "Please click into an input field before starting dictation.",
+    "error_micro_permission": "Error: Microphone access denied. Please allow it in browser settings.",
+    "error_general_start": "Dictation start error. Please check your connection and mic permissions.",
+    "error_general_start_prefix": "Start Error: "
+  },
+  "ar": {
+    "title": "عرض الإملاء",
+    "loading": "جاري التحميل...",
+    "patient_name": "اسم المريض",
+    "symptoms": "الأعراض",
+    "clinical_notes": "ملاحظات سريرية",
+    "instructions_title": "كيفية الاستخدام",
+    "instructions": [
+      "انقر داخل حقل لتحديد موقع المؤشر",
+      "انقر على أيقونة الميكروفون لبدء الإملاء",
+      "تحدث بوضوح في الميكروفون",
+      "سيظهر النص في موضع المؤشر",
+      "اضغط على Esc أو على الأيقونة للإيقاف"
+    ],
+    "dictate_button": "تم تفعيل الإملاء",
+    "stop_dictation": "نهاية الإملاء",
+    "field_selected": "تم اختيار الحقل. جاهز للإملاء.",
+    "default_mic_name": "الميكروفون الافتراضي",
+    "no_mic_found": "لم يتم الكشف عن ميكروفون.",
+    "mic_selected_success": "تم اختيار الميكروفون.",
+    "error_no_field_selected": "الرجاء النقر داخل حقل إدخال قبل بدء الإملاء.",
+    "error_micro_permission": "خطأ: تم رفض الوصول إلى الميكروفون. يرجى السماح بذلك في إعدادات المتصفح.",
+    "error_general_start": "خطأ في بدء الإملاء. يرجى التحقق من اتصالك وأذونات الميكروفون.",
+    "error_general_start_prefix": "خطأ في البدء: "
+  },
+  "de": {
+    "title": "Diktat-Demo",
+    "loading": "Wird geladen...",
+    "patient_name": "Patientenname",
+    "symptoms": "Symptome",
+    "clinical_notes": "Klinische Notizen",
+    "instructions_title": "Wie man es benutzt",
+    "instructions": [
+      "Klicken Sie in ein Feld, um den Cursor zu positionieren",
+      "Klicken Sie auf das Mikrofonsymbol, um das Diktat zu starten",
+      "Sprechen Sie deutlich in das Mikrofon",
+      "Der Text wird an der Cursorposition angezeigt",
+      "Drücken Sie Esc oder klicken Sie auf das Symbol, um zu stoppen"
+    ],
+    "dictate_button": "Diktat aktiviert",
+    "stop_dictation": "Diktat beendet",
+    "field_selected": "Feld ausgewählt. Bereit zum Diktieren.",
+    "default_mic_name": "Standard-Mikrofon",
+    "no_mic_found": "Kein Mikrofon erkannt.",
+    "mic_selected_success": "Mikrofon ausgewählt.",
+    "error_no_field_selected": "Bitte klicken Sie in ein Eingabefeld, bevor Sie mit dem Diktieren beginnen.",
+    "error_micro_permission": "Fehler: Mikrofonzugriff verweigert. Bitte erlauben Sie diesen in den Browsereinstellungen.",
+    "error_general_start": "Fehler beim Starten des Diktats. Bitte überprüfen Sie Ihre Verbindung und Mikrofonberechtigungen.",
+    "error_general_start_prefix": "Startfehler: "
+  }
+}
