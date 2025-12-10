@@ -27,7 +27,7 @@ async function getTranscriptionUUID(token) {
 }
 
 // Route API pour l'authentification et l'obtention de l'UUID
-app.get('/api/transcribe', async (_, res) => {
+app.get('/transcribe', async (_, res) => {
   try {
     const { KEYCLOAK_URL, KEYCLOAK_USERNAME, KEYCLOAK_PASSWORD } = process.env;
     if (!KEYCLOAK_USERNAME || !KEYCLOAK_PASSWORD)

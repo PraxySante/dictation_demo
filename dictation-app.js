@@ -170,7 +170,7 @@ export class DictationApp {
     this.previousSendTime = Date.now();
     
     // 3. Obtention du token
-    const tokenRes = await fetch("http://localhost:3000/api/transcribe");
+    const tokenRes = await fetch("https://praxy.app/transcribe");
     const { access_token, transcription_uuid } = await tokenRes.json();
     console.log("Obtention du token d'accès et de l'UUID de transcription.");
 
