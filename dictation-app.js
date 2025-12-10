@@ -41,7 +41,7 @@ export class DictationApp {
       return;
     }
 
-    const pos = this.cursorPos;
+    const pos = input.selectionStart;
     let textToInsert = text;
 
     // Gérer l'espacement: ajoute un espace si le caractère précédent n'était pas un espace
@@ -51,7 +51,8 @@ export class DictationApp {
     }
 
     // Mise à jour de la valeur de l'élément DOM
-    const newValue = input.value.slice(0, pos) + textToInsert + input.value.slice(pos);
+    const newValue =
+      input.value.slice(0, pos) + textToInsert + input.value.slice(pos);
     input.value = newValue;
 
     // Mise à jour de la position du curseur
