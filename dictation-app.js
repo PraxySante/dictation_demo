@@ -44,9 +44,16 @@ export class DictationApp {
     const pos = input.selectionStart;
     let textToInsert = text;
 
+
+    const punctuation = [".", ",", ";", ":", "!", "?", " "];
+
     // Gérer l'espacement: ajoute un espace si le caractère précédent n'était pas un espace
     // ET si le texte à insérer ne commence pas déjà par un espace.
-    if (pos > 0 && input.value[pos - 1] !== " " && text[0] !== " ") {
+    if (
+      pos > 0 &&
+      input.value[pos - 1] !== " " &&
+      !punctuation.includes(text[0])
+    ) {
       textToInsert = " " + text;
     }
 
