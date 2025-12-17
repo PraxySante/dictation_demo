@@ -45,18 +45,6 @@ export class DictationApp {
     let textToInsert = text;
 
 
-    const punctuation = [".", ",", ";", ":", "!", "?", " "];
-
-    // Gérer l'espacement: ajoute un espace si le caractère précédent n'était pas un espace
-    // ET si le texte à insérer ne commence pas déjà par un espace.
-    if (
-      pos > 0 &&
-      input.value[pos - 1] !== " " &&
-      !punctuation.includes(text[0])
-    ) {
-      textToInsert = " " + text;
-    }
-
     // Mise à jour de la valeur de l'élément DOM
     const newValue =
       input.value.slice(0, pos) + textToInsert + input.value.slice(pos);
@@ -67,17 +55,13 @@ export class DictationApp {
     input.setSelectionRange(newPos, newPos);
     this.cursorPos = newPos;
 
-    // Déclencher un événement 'input' pour les frameworks (comme React) qui pourraient écouter
-    input.dispatchEvent(new Event("input", { bubbles: true }));
-
-    console.log(`Texte inséré. Nouveau curseur à: ${newPos}`);
-    this.onTranscriptUpdate(newValue); // Mettre à jour le DOM ou l'état de l'application externe
+ // Mettre à jour le DOM ou l'état de l'application externe  
+    this.onTranscriptUpdate(newValue);
   }
 
   /**
    * Envoie le tampon audio au WebSocket.
-   * (Équivalent de la fonction sendData)
-   * @param {ArrayBuffer} audioBuffer Le tampon audio Int16.buffer à envoyer.
+   * @param {ArrayBuffer} audioBuffer 
    */
   sendData(audioBuffer) {
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
@@ -86,7 +70,6 @@ export class DictationApp {
   }
 
   /**
-   
    * @param {Float32Array} sampleData 
    */
   processAudio(sampleData) {
