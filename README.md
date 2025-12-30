@@ -8,7 +8,7 @@ This project enables voice dictation in input fields (`input` or `textarea`) by 
 ## Table of Contents
 
 - [Installation & Configuration](#installation--configuration)
-- [Dictation functions](#technical-architecture)
+- [Dictation functions](#dictation-functions)
 - [Usage](#usage)
 - [Technologies](#technologies)
 
