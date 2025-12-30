@@ -161,7 +161,7 @@ export class DictationApp {
     this.previousSendTime = Date.now();
     
     // 3. Obtention du token
-    const tokenRes = await fetch("https://praxy.app/getuuid/transcribe");
+    const tokenRes = await fetch("http://localhost:3000/transcribe");
     const { access_token, transcription_uuid } = await tokenRes.json();
     console.log("Obtention du token d'accès et de l'UUID de transcription.");
 
@@ -171,7 +171,8 @@ export class DictationApp {
 
     this.ws.onopen = async () => {
       console.log("WS OPEN - Démarrage de l'enregistrement...");
-      this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      this.audioContext = new (window.AudioContext ||
+        window.webkitAudioContext)();
 
       try {
         // 5. Accès au micro
@@ -180,7 +181,9 @@ export class DictationApp {
         });
 
         const input = this.audioContext.createMediaStreamSource(this.stream);
-        const recordingNode = await this.setupRecordingWorkletNode(this.audioContext);
+        const recordingNode = await this.setupRecordingWorkletNode(
+          this.audioContext
+        );
         this.workletNode = recordingNode;
 
         // 6. Connexion de l'AudioWorklet et gestion des messages
@@ -192,10 +195,10 @@ export class DictationApp {
         // Mise à jour de l'état
         this.isRecording = true;
         this.onRecordingStateChange(true);
-
       } catch (error) {
         console.error("Erreur de démarrage audio/micro :", error);
-        if (this.audioContext && this.audioContext.state !== "closed") this.audioContext.close();
+        if (this.audioContext && this.audioContext.state !== "closed")
+          this.audioContext.close();
         this.isRecording = false;
         this.onRecordingStateChange(false);
         this.onError(`Erreur d'accès au micro: ${error.name || error.message}`);
@@ -213,7 +216,6 @@ export class DictationApp {
           data.message.transcript
         ) {
           const newText = data.message.transcript;
-          console.log("Texte reçu du serveur (avant insertion):", newText);
           this.insertAtCursor(newText);
         } else {
           console.log(`Statut WS: ${data.type}`);

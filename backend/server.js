@@ -14,7 +14,7 @@ app.use((_, res, next) => {
 
 // Fonction pour obtenir l'UUID de transcription
 async function getTranscriptionUUID(token) {
-  const res = await fetch(process.env.TRANSCRIBE_START_URL, {
+  const res = await fetch(process.env.TRANSCRIBE_URL + "/transcribe/start", {
     headers: { Authorization: `Bearer ${token}` },
   });
 
@@ -27,24 +27,26 @@ async function getTranscriptionUUID(token) {
 }
 
 // Route API pour l'authentification et l'obtention de l'UUID
-app.get('/transcribe', async (_, res) => {
+app.get("/transcribe", async (_, res) => {
   try {
-    const { KEYCLOAK_URL, KEYCLOAK_USERNAME, KEYCLOAK_PASSWORD } = process.env;
-    if (!KEYCLOAK_USERNAME || !KEYCLOAK_PASSWORD)
-      return res.status(500).json({ error: "Identifiants Keycloak manquants." });
+    const { TRANSCRIBE_URL, PARTNER_USERNAME, PARTNER_PASSWORD } = process.env;
+    if (!PARTNER_USERNAME || !PARTNER_PASSWORD)
+      return res.status(500).json({ error: "Identifiants  manquants." });
 
-    // Authentification 
-    const authRes = await fetch(KEYCLOAK_URL, {
+    // Authentification
+    const authRes = await fetch(TRANSCRIBE_URL + "/user/token", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        username: KEYCLOAK_USERNAME,
-        password: KEYCLOAK_PASSWORD,
+        username: PARTNER_USERNAME,
+        password: PARTNER_PASSWORD,
       }),
     });
 
     if (!authRes.ok)
-      throw new Error(`Auth Keycloak: ${authRes.status} ${await authRes.text()}`);
+      throw new Error(
+        `Auth PARTNER: ${authRes.status} ${await authRes.text()}`
+      );
 
     const token = (await authRes.json()).access_token;
 
@@ -52,7 +54,6 @@ app.get('/transcribe', async (_, res) => {
     const transcription_uuid = await getTranscriptionUUID(token);
 
     res.json({ access_token: token, transcription_uuid });
-
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
