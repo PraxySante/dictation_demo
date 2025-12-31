@@ -96,12 +96,8 @@ The backend will be listening on `http://localhost:3000`
 
 ##### Frontend
 
-1. Navigate to the frontend folder:
-```bash
-cd frontend
-```
-
-2. Serve the frontend using a local server (required):
+ From the project root, serve the frontend using a local server (required):
+ 
 ```bash
 # Using Python
 python -m http.server 8088
