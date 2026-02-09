@@ -3,10 +3,10 @@
 import { decreaseSampleRate, convertFloat32ToInt16 } from './audioUtils.js';
 
 const OUTPUT_SAMPLE_RATE = 16000;
-const REFRESH_RATE_MS = 20;
+const REFRESH_RATE_MS = 10;
 
 export class DictationApp {
-  constructor(language = 'fr') {
+  constructor(language = "fr") {
     this.isRecording = false;
     this.language = language;
 
@@ -14,68 +14,247 @@ export class DictationApp {
     this.stream = null;
     this.audioContext = null;
     this.workletNode = null;
-    this.activeInput = null;
-    this.cursorPos = 0;
 
-    this.refreshData = new Int16Array(0); 
+    this.refreshData = new Int16Array(0);
     this.previousSendTime = 0;
     this.isWorkletLoaded = false;
 
-    // Références DOM pour les événements 
-    this.onRecordingStateChange = (isRecording) => console.log('Recording:', isRecording);
-    this.onTranscriptUpdate = (text) => console.log('Transcript:', text);
-    this.onError = (message) => console.error('Error:', message);
+    // 🔑 Suivi du contexte actif
+    this.currentActiveInput = null;
+    this.activeInputSnapshot = null; // Snapshot du champ au moment de l'envoi audio
+
+    // 🆕 File de séquences: pour chaque paquet audio envoyé, on stocke le champ cible
+    this.audioSequenceQueue = []; // [{inputElement, timestamp, sequenceId}]
+    this.sequenceCounter = 0;
+
+    // 🆕 Debounce pour détecter le changement de focus
+    this.focusChangeTimeout = null;
+    this.pendingContextChange = false;
+
+    // Callbacks
+    this.onRecordingStateChange = (isRecording) =>
+      console.log("Recording:", isRecording);
+    this.onTranscriptUpdate = (text, targetInput) =>
+      console.log("Transcript:", text);
+    this.onError = (message) => console.error("Error:", message);
   }
 
-  // --- Utility Methods ---
+  /**
+   * 🆕 Capture l'élément actuellement actif s'il est valide
+   */
+  captureActiveInput() {
+    const currentActive = document.activeElement;
+
+    const isValidInput =
+      currentActive &&
+      (currentActive.tagName === "INPUT" ||
+        currentActive.tagName === "TEXTAREA") &&
+      document.body.contains(currentActive);
+
+    return isValidInput ? currentActive : null;
+  }
 
   /**
-   * Insère le texte à la position du curseur dans l'élément actif.
-   * (Équivalent de la fonction insertAtCursor)
-   * @param {string} text Le texte à insérer.
+   * 🆕 Détecte si le focus a changé
    */
-  insertAtCursor(text) {
-    const input = this.activeInput;
-    if (!input) {
-      this.onError("ERREUR D'INSERTION: Champ de saisie actif non défini.");
-      return;
+  detectFocusChange() {
+    const currentInput = this.captureActiveInput();
+
+    // Si changement détecté
+    if (currentInput !== this.currentActiveInput) {
+      const oldInput = this.currentActiveInput;
+      this.currentActiveInput = currentInput;
+
+      if (oldInput && currentInput) {
+        console.log(
+          `[Focus] Changement: ${oldInput.id || oldInput.name || "input"} → ${
+            currentInput.id || currentInput.name || "input"
+          }`
+        );
+      } else if (currentInput) {
+        console.log(
+          `[Focus] Nouveau champ actif: ${
+            currentInput.id || currentInput.name || "input"
+          }`
+        );
+      } else {
+        console.log("[Focus] Plus de champ actif");
+      }
+
+      // Signaler qu'un changement de contexte est en attente
+      this.pendingContextChange = true;
+
+      // Invalider les séquences en attente de l'ancien input
+      if (oldInput) {
+        this.invalidateSequencesForInput(oldInput);
+      }
+
+      return true;
     }
 
-    const pos = input.selectionStart;
-    let textToInsert = text;
-
-
-    // Mise à jour de la valeur de l'élément DOM
-    const newValue =
-      input.value.slice(0, pos) + textToInsert + input.value.slice(pos);
-    input.value = newValue;
-
-    // Mise à jour de la position du curseur
-    const newPos = pos + textToInsert.length;
-    input.setSelectionRange(newPos, newPos);
-    this.cursorPos = newPos;
-
- // Mettre à jour le DOM ou l'état de l'application externe  
-    this.onTranscriptUpdate(newValue);
+    return false;
   }
 
   /**
-   * Envoie le tampon audio au WebSocket.
-   * @param {ArrayBuffer} audioBuffer 
+   * 🆕 Invalide toutes les séquences liées à un input spécifique
+   */
+  invalidateSequencesForInput(inputElement) {
+    const before = this.audioSequenceQueue.length;
+    this.audioSequenceQueue = this.audioSequenceQueue.filter(
+      (seq) => seq.inputElement !== inputElement
+    );
+    const removed = before - this.audioSequenceQueue.length;
+
+    if (removed > 0) {
+      console.log(`[Sequence] ${removed} séquence(s) invalidée(s)`);
+    }
+  }
+
+  /**
+   * 🆕 Enregistre qu'un paquet audio a été envoyé pour un input donné
+   */
+  registerAudioSequence(inputElement) {
+    if (!inputElement) return null;
+
+    const sequenceId = ++this.sequenceCounter;
+    const sequence = {
+      inputElement,
+      timestamp: Date.now(),
+      sequenceId,
+    };
+
+    this.audioSequenceQueue.push(sequence);
+
+    // Nettoyer les vieilles séquences (>5 secondes sans réponse = anormal)
+    const cutoffTime = Date.now() - 5000;
+    this.audioSequenceQueue = this.audioSequenceQueue.filter(
+      (seq) => seq.timestamp > cutoffTime
+    );
+
+    console.log(
+      `[Sequence] Audio #${sequenceId} envoyé pour input, file: ${this.audioSequenceQueue.length}`
+    );
+
+    return sequenceId;
+  }
+
+  /**
+   * 🆕 Récupère le prochain input de destination attendu
+   * Retourne null si la file est vide ou si l'input n'est plus valide
+   */
+  getNextExpectedInput() {
+    // Nettoyer les inputs qui ne sont plus dans le DOM
+    this.audioSequenceQueue = this.audioSequenceQueue.filter((seq) =>
+      document.body.contains(seq.inputElement)
+    );
+
+    if (this.audioSequenceQueue.length === 0) {
+      return null;
+    }
+
+    // Retourner le plus ancien (FIFO)
+    const sequence = this.audioSequenceQueue[0];
+    return sequence.inputElement;
+  }
+
+  /**
+   * 🆕 Consomme la prochaine séquence de la file
+   */
+  consumeNextSequence() {
+    if (this.audioSequenceQueue.length === 0) {
+      return null;
+    }
+
+    const sequence = this.audioSequenceQueue.shift();
+    console.log(
+      `[Sequence] Consommation #${sequence.sequenceId}, reste: ${this.audioSequenceQueue.length}`
+    );
+
+    return sequence;
+  }
+
+  /**
+   * 🆕 Insère le texte dans le bon input selon la file de séquences
+   */
+  insertTranscription(text) {
+    // Récupérer la séquence attendue
+    const sequence = this.consumeNextSequence();
+
+    if (!sequence) {
+      console.warn(
+        "[Insert] ⚠️ Aucune séquence en attente - transcription ignorée"
+      );
+      return false;
+    }
+
+    const targetInput = sequence.inputElement;
+
+    // Vérifier que l'input est toujours valide
+    if (!document.body.contains(targetInput)) {
+      console.warn("[Insert] ⚠️ Input cible plus dans le DOM");
+      return false;
+    }
+
+    if (targetInput.tagName !== "INPUT" && targetInput.tagName !== "TEXTAREA") {
+      console.warn("[Insert] ⚠️ Élément cible invalide");
+      return false;
+    }
+
+    // ✅ INSERTION
+    const pos = targetInput.selectionStart ?? targetInput.value.length;
+    const end = targetInput.selectionEnd ?? pos;
+
+    targetInput.value =
+      targetInput.value.slice(0, pos) + text + targetInput.value.slice(end);
+
+    const newPos = pos + text.length;
+    targetInput.setSelectionRange(newPos, newPos);
+
+    // Déclencher l'événement input pour les frameworks
+    targetInput.dispatchEvent(new Event("input", { bubbles: true }));
+
+    const inputName = targetInput.id || targetInput.name || "input";
+    console.log(`[Insert] ✓ Texte inséré dans "${inputName}": "${text}"`);
+
+    // Notifier via callback
+    this.onTranscriptUpdate(text, targetInput);
+
+    return true;
+  }
+
+  /**
+   * Envoie le tampon audio au WebSocket
    */
   sendData(audioBuffer) {
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      // 🔑 CAPTURER le champ actif au moment de l'envoi
+      const targetInput = this.captureActiveInput();
+
+      if (!targetInput) {
+        console.warn("[Send] Pas de champ actif - audio non envoyé");
+        return;
+      }
+
+      // Enregistrer la séquence: cet audio correspond à ce champ
+      this.registerAudioSequence(targetInput);
+
+      // Réinitialiser le flag de changement de contexte
+      this.pendingContextChange = false;
+
+      // Envoyer l'audio
       this.ws.send(audioBuffer);
     }
   }
 
   /**
-   * @param {Float32Array} sampleData 
+   * Traite l'audio du worklet
    */
   processAudio(sampleData) {
     if (!this.audioContext || this.audioContext.state === "closed") return;
 
-    // 1. Ré-échantillonnage
+    // 🆕 Vérifier si le focus a changé
+    this.detectFocusChange();
+
     const decreaseResultBuffer = decreaseSampleRate(
       sampleData,
       this.audioContext.sampleRate,
@@ -83,10 +262,8 @@ export class DictationApp {
     );
     if (!decreaseResultBuffer) return;
 
-    // 2. Conversion en Int16
     const audioDataInt16 = convertFloat32ToInt16(decreaseResultBuffer);
 
-    // 3. Accumulation des données
     const currentData = this.refreshData;
     const newLength = currentData.length + audioDataInt16.length;
     const newBuffer = new Int16Array(newLength);
@@ -94,7 +271,6 @@ export class DictationApp {
     newBuffer.set(audioDataInt16, currentData.length);
     this.refreshData = newBuffer;
 
-    // 4. Vérification et envoi
     const currentTime = Date.now();
     if (currentTime - this.previousSendTime > REFRESH_RATE_MS) {
       if (this.refreshData.length > 0) {
@@ -106,107 +282,112 @@ export class DictationApp {
   }
 
   /**
-   * Charge le Worklet et crée le nœud.
-   * @param {AudioContext} context
+   * Charge le Worklet
    */
   async setupRecordingWorkletNode(context) {
     if (!context.audioWorklet) {
-      throw new Error("AudioWorklet non supporté par ce navigateur.");
+      throw new Error("AudioWorklet non supporté");
     }
 
     if (!this.isWorkletLoaded) {
-      console.log("Chargement du module audio-processor.js...");
-      try {
-        await context.audioWorklet.addModule("./audio-processor.js");
-        this.isWorkletLoaded = true;
-      } catch (e) {
-        console.error("Erreur lors du chargement du module AudioWorklet:", e);
-        throw new Error("Échec du chargement du script audio-processor.js.");
-      }
+      await context.audioWorklet.addModule("./audio-processor.js");
+      this.isWorkletLoaded = true;
     }
     return new AudioWorkletNode(context, "audio-processor");
   }
 
-
-
   /**
-   * Démarre l'enregistrement et la dictée.
-   * @param {string} selectedMicId L'ID du microphone à utiliser.
-   * @param {HTMLElement} targetElement Le champ de saisie (INPUT/TEXTAREA) cible.
+   * Démarre l'enregistrement
    */
-  async startDictation(selectedMicId, targetElement) {
-    if (this.isRecording) return;
-    if (!selectedMicId) throw new Error("Microphone non sélectionné");
-
-    // 1. Validation de l'élément cible
-    if (
-      !targetElement ||
-      !(
-        targetElement.tagName === "INPUT" ||
-        targetElement.tagName === "TEXTAREA"
-      )
-    ) {
-      this.onError("Veuillez sélectionner un champ de saisie valide.");
-      throw new Error("Élément cible non valide ou manquant.");
+  async startDictation(selectedMicId) {
+    if (this.isRecording) {
+      console.warn("[Dictation] Déjà en cours d'enregistrement");
+      return;
+    }
+    if (!selectedMicId) {
+      throw new Error("Microphone non sélectionné");
     }
 
-    // 2. Sauvegarde de l'élément et de la position
-    this.activeInput = targetElement;
-    this.cursorPos = targetElement.selectionStart || targetElement.value.length || 0;
-    targetElement.focus();
-    console.log(`Element cible sauvegardé: ${targetElement.tagName}. Démarrage à la position: ${this.cursorPos}`);
+    // 🔑 Capturer le champ actif initial
+    this.currentActiveInput = this.captureActiveInput();
 
+    if (this.currentActiveInput) {
+      const inputName =
+        this.currentActiveInput.id || this.currentActiveInput.name || "input";
+      console.log(`[Dictation] Démarrage avec champ actif: "${inputName}"`);
+    } else {
+      console.log("[Dictation] Démarrage sans champ actif");
+    }
 
+    // Réinitialiser les états
     this.refreshData = new Int16Array(0);
     this.previousSendTime = Date.now();
-    
-    // 3. Obtention du token
-    const tokenRes = await fetch("http://localhost:3000/transcribe");
-    const { access_token, transcription_uuid } = await tokenRes.json();
-    console.log("Obtention du token d'accès et de l'UUID de transcription.");
+    this.audioSequenceQueue = [];
+    this.sequenceCounter = 0;
+    this.pendingContextChange = false;
 
-    // 4. Configuration du WebSocket
+    // Initialiser AudioContext
+    this.audioContext = new (window.AudioContext ||
+      window.webkitAudioContext)();
+
+    // Obtenir le token
+    let tokenRes, access_token, transcription_uuid;
+    try {
+      tokenRes = await fetch("http://localhost:3000/transcribe");
+      if (!tokenRes.ok) {
+        throw new Error(`HTTP ${tokenRes.status}`);
+      }
+      const data = await tokenRes.json();
+      access_token = data.access_token;
+      transcription_uuid = data.transcription_uuid;
+      console.log("[API] Token obtenu");
+    } catch (error) {
+      console.error("[API] Erreur token:", error);
+      this.cleanup();
+      this.onError(`Impossible d'obtenir le token: ${error.message}`);
+      throw error;
+    }
+
+    // WebSocket
     const wsUrl = `wss://ts.backend.praxysante.fr/dev-partenaires/ws/transcribe/${transcription_uuid}?token=${access_token}&user_uuid=USERDEMO&language=${this.language}&dictation_mode=true&full_text=true`;
     this.ws = new WebSocket(wsUrl);
 
     this.ws.onopen = async () => {
-      console.log("WS OPEN - Démarrage de l'enregistrement...");
-      this.audioContext = new (window.AudioContext ||
-        window.webkitAudioContext)();
+      console.log("[WebSocket] Connexion établie");
+
+      if (!this.audioContext || this.audioContext.state === "closed") {
+        this.onError("Erreur: AudioContext invalide");
+        this.stopDictation();
+        return;
+      }
 
       try {
-        // 5. Accès au micro
         this.stream = await navigator.mediaDevices.getUserMedia({
           audio: { deviceId: { exact: selectedMicId } },
         });
-
         const input = this.audioContext.createMediaStreamSource(this.stream);
         const recordingNode = await this.setupRecordingWorkletNode(
           this.audioContext
         );
         this.workletNode = recordingNode;
 
-        // 6. Connexion de l'AudioWorklet et gestion des messages
         recordingNode.port.onmessage = (event) => {
           this.processAudio(event.data);
         };
 
         input.connect(recordingNode);
-        // Mise à jour de l'état
+
         this.isRecording = true;
         this.onRecordingStateChange(true);
+        console.log("[Dictation] ✓ Enregistrement démarré");
       } catch (error) {
-        console.error("Erreur de démarrage audio/micro :", error);
-        if (this.audioContext && this.audioContext.state !== "closed")
-          this.audioContext.close();
         this.isRecording = false;
         this.onRecordingStateChange(false);
-        this.onError(`Erreur d'accès au micro: ${error.name || error.message}`);
+        this.cleanup();
         throw error;
       }
     };
 
-    // 7. Gestion des messages du WebSocket
     this.ws.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
@@ -216,55 +397,69 @@ export class DictationApp {
           data.message.transcript
         ) {
           const newText = data.message.transcript;
-          this.insertAtCursor(newText);
-        } else {
-          console.log(`Statut WS: ${data.type}`);
+
+          // 🎯 INSERTION selon la file de séquences
+          this.insertTranscription(newText);
+        } else if (data.type) {
+          console.log(`[WebSocket] Message - type: ${data.type}`);
         }
-      } catch {
-        console.warn("Message WS non JSON ou erreur de parsing.");
+      } catch (e) {
+        console.warn("[WebSocket] Message non JSON:", e);
       }
     };
 
     this.ws.onerror = (err) => {
-      console.error("WS ERROR:", err);
-      this.onError("Erreur de connexion au serveur de transcription.");
-      this.stopDictation(); // Arrêter la dictée en cas d'erreur WS
+      console.error("[WebSocket] Erreur:", err);
+      this.stopDictation();
     };
-    
+
     this.ws.onclose = () => {
-      console.warn("WS CLOSED");
-      this.stopDictation(); // Arrêter la dictée en cas de fermeture WS
+      console.log("[WebSocket] Connexion fermée");
+      if (this.isRecording) {
+        this.stopDictation();
+      }
     };
   }
 
   /**
-   * Arrête l'enregistrement et ferme les connexions.
+   * Nettoie les ressources
    */
-  stopDictation() {
-    this.isRecording = false;
-    this.onRecordingStateChange(false);
-
+  cleanup() {
     if (this.stream) {
       this.stream.getTracks().forEach((t) => t.stop());
       this.stream = null;
     }
 
-    // Fermer l'AudioContext
+    if (this.workletNode) {
+      this.workletNode.disconnect();
+      this.workletNode = null;
+    }
+
     if (this.audioContext && this.audioContext.state !== "closed") {
       this.audioContext.close().catch(console.error);
     }
     this.audioContext = null;
-    this.workletNode = null;
 
-    // Fermer le WebSocket
+    this.refreshData = new Int16Array(0);
+    this.audioSequenceQueue = [];
+  }
+
+  /**
+   * Arrête l'enregistrement
+   */
+  stopDictation() {
+    this.isRecording = false;
+    this.onRecordingStateChange(false);
+
+    this.cleanup();
+
     if (this.ws) {
       this.ws.close();
       this.ws = null;
     }
 
-    // Réinitialiser les tampons
-    this.refreshData = new Int16Array(0);
     this.isWorkletLoaded = false;
-    this.activeInput = null;
+    this.currentActiveInput = null;
+    this.pendingContextChange = false;
   }
 }
